@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>下載遊戲 | 全民猜猜猜</title>
+    <meta name="description" content="免費下載全民猜猜猜！支援 iOS 與 Android 雙平台，立即加入 85 萬玩家的行列！">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Inter"', '"Noto Sans TC"', 'system-ui', 'sans-serif'] },
+                    colors: {
+                        primary: { 50:'#ecfdf5', 100:'#d1fae5', 200:'#a7f3d0', 300:'#6ee7b7', 400:'#34d399', 500:'#10b981', 600:'#059669', 700:'#047857' },
+                        sky: { 50:'#eff6ff', 100:'#dbeafe', 200:'#bfdbfe', 300:'#93c5fd', 400:'#60a5fa', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8' },
+                        accent: { 400:'#fbbf24', 500:'#f59e0b', 600:'#d97706' },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Inter', 'Noto Sans TC', system-ui, sans-serif; scroll-behavior: smooth; }
+        .hero-gradient { background: linear-gradient(135deg, #10b981 0%, #3b82f6 50%, #6366f1 100%); }
+        .float-anim { animation: floatY 3s ease-in-out infinite; }
+        .float-anim-delay { animation: floatY 3s ease-in-out 1.5s infinite; }
+        @keyframes floatY { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+        @keyframes bounceIn { 0%{opacity:0;transform:scale(0.3)} 50%{opacity:1;transform:scale(1.05)} 70%{transform:scale(0.95)} 100%{transform:scale(1)} }
+        @keyframes wiggle { 0%,100%{transform:rotate(0deg)} 25%{transform:rotate(-5deg)} 75%{transform:rotate(5deg)} }
+        @keyframes pulse-ring { 0%{box-shadow:0 0 0 0 rgba(16,185,129,0.4)} 70%{box-shadow:0 0 0 15px rgba(16,185,129,0)} 100%{box-shadow:0 0 0 0 rgba(16,185,129,0)} }
+        .bounce-in { animation: bounceIn 0.8s cubic-bezier(0.68,-0.55,0.265,1.55) forwards; }
+        .wiggle { animation: wiggle 2s ease-in-out infinite; }
+        .pulse-ring { animation: pulse-ring 2s infinite; }
+        .card-hover:hover { transform: translateY(-6px); box-shadow: 0 20px 60px -12px rgba(16,185,129,0.2); }
+        .card-hover { transition: all 0.4s cubic-bezier(0.4,0,0.2,1); }
+        .text-gradient { background: linear-gradient(135deg, #10b981, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        ::-webkit-scrollbar{width:8px} ::-webkit-scrollbar-track{background:#ecfdf5}
+        ::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#10b981,#3b82f6);border-radius:4px}
+        .step-connector { position: relative; }
+        .step-connector::after { content:''; position:absolute; top:50%; left:100%; width:100%; height:3px; background:linear-gradient(90deg,#10b981,#3b82f6); }
+        @media (max-width:768px) { .step-connector::after { display:none; } }
+    </style>
+</head>
+<body class="bg-emerald-50/30">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const Icon = ({ name, className = '', size = 24 }) => {
+            const lucideInstance = window.lucide || {};
+            let iconData = lucideInstance.icons
+                ? (lucideInstance.icons[name] || lucideInstance.icons[name.charAt(0).toLowerCase() + name.slice(1)])
+                : null;
+            if (!iconData) return <div style={{ width: size, height: size }} className={className}></div>;
+            const [tag, attrs, children] = iconData;
+            const safeChildren = Array.isArray(children) ? children : [];
+            return React.createElement(tag, {
+                ...attrs, width: size, height: size, className,
+                dangerouslySetInnerHTML: {
+                    __html: safeChildren.map(child => {
+                        const [cTag, cAttrs] = child;
+                        const attrStr = Object.entries(cAttrs).map(([k, v]) => `${k}="${v}"`).join(' ');
+                        return `<${cTag} ${attrStr}></${cTag}>`;
+                    }).join('')
+                }
+            });
+        };
+
+        // ── 導覽列 ──
+        function Navbar() {
+            const [scrolled, setScrolled] = useState(false);
+            const [mobileOpen, setMobileOpen] = useState(false);
+            useEffect(() => {
+                const h = () => setScrolled(window.scrollY > 50);
+                window.addEventListener('scroll', h);
+                return () => window.removeEventListener('scroll', h);
+            }, []);
+            const links = [
+                { href: 'index.html', label: '首頁' },
+                { href: 'gameplay.html', label: '玩法說明' },
+                { href: 'download.html', label: '下載遊戲', active: true },
+            ];
+            return (
+                <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/90 backdrop-blur-xl shadow-lg shadow-emerald-100/50' : 'bg-transparent'}`}>
+                    <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+                        <a href="index.html" className="flex items-center space-x-2 group">
+                            <span className="text-3xl group-hover:animate-bounce">🧠</span>
+                            <span className={`text-xl font-black tracking-tight transition-colors ${scrolled ? 'text-emerald-600' : 'text-white'}`}>全民猜猜猜</span>
+                        </a>
+                        <div className="hidden md:flex items-center space-x-1">
+                            {links.map(l => (
+                                <a key={l.href} href={l.href}
+                                   className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${l.active ? (scrolled ? 'bg-emerald-100 text-emerald-700' : 'bg-white/20 text-white') : (scrolled ? 'text-gray-600 hover:text-emerald-600 hover:bg-emerald-50' : 'text-white/80 hover:text-white hover:bg-white/10')}`}>
+                                    {l.label}
+                                </a>
+                            ))}
+                            <a href="#download-section" className="ml-4 bg-gradient-to-r from-emerald-500 to-blue-500 text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-105 transition-all">
+                                立即下載 🎮
+                            </a>
+                        </div>
+                        <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2">
+                            <Icon name={mobileOpen ? 'x' : 'menu'} size={24} className={scrolled ? 'text-gray-700' : 'text-white'} />
+                        </button>
+                    </div>
+                    {mobileOpen && (
+                        <div className="md:hidden bg-white/95 backdrop-blur-xl border-t border-emerald-100 px-6 py-4 space-y-2">
+                            {links.map(l => (
+                                <a key={l.href} href={l.href} onClick={() => setMobileOpen(false)}
+                                   className={`block px-4 py-3 rounded-xl font-bold transition-colors ${l.active ? 'bg-emerald-50 text-emerald-700' : 'text-gray-600 hover:bg-emerald-50 hover:text-emerald-600'}`}>
+                                    {l.label}
+                                </a>
+                            ))}
+                        </div>
+                    )}
+                </nav>
+            );
+        }
+
+        // ── Footer ──
+        function Footer() {
+            return (
+                <footer className="bg-gray-900 text-gray-400 py-16 px-6">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
+                            <div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="text-2xl">🧠</span>
+                                    <span className="text-xl font-black text-white">全民猜猜猜</span>
+                                </div>
+                                <p className="text-sm leading-relaxed">容易上癮 5 分鐘就可以變聰明的全民益智遊戲！</p>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white mb-4">快速連結</h4>
+                                <div className="space-y-2 text-sm">
+                                    <a href="index.html" className="block hover:text-emerald-400 transition-colors">首頁</a>
+                                    <a href="gameplay.html" className="block hover:text-emerald-400 transition-colors">玩法說明</a>
+                                    <a href="download.html" className="block hover:text-emerald-400 transition-colors">下載遊戲</a>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white mb-4">下載連結</h4>
+                                <div className="space-y-2 text-sm">
+                                    <a href="https://itunes.apple.com/us/app/quan-min-cai-cai-cai/id702649687?ls=1&mt=8" className="block hover:text-emerald-400 transition-colors flex items-center gap-2"><Icon name="smartphone" size={14} /> iOS 版</a>
+                                    <a href="https://play.google.com/store/apps/details?id=com.igs.QuizKing" className="block hover:text-emerald-400 transition-colors flex items-center gap-2"><Icon name="smartphone" size={14} /> Android 版</a>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white mb-4">聯繫我們</h4>
+                                <div className="space-y-2 text-sm">
+                                    <a href="https://www.gt.web" className="flex items-center gap-2 hover:text-emerald-400 transition-colors"><Icon name="globe" size={14} /> gametower 官網</a>
+                                    <a href="#" className="flex items-center gap-2 hover:text-emerald-400 transition-colors"><Icon name="message-circle" size={14} /> Facebook 粉絲團</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="border-t border-gray-800 pt-8 text-center text-sm">
+                            © 2026 全民猜猜猜 by gametower. All rights reserved.
+                        </div>
+                    </div>
+                </footer>
+            );
+        }
+
+        // ── 主應用 ──
+        function App() {
+            const [registerStep, setRegisterStep] = useState(0);
+
+            const steps = [
+                { title: '點擊申請帳號', icon: 'user-plus', desc: '前往 gametower 會員中心，點擊「申請帳號」按鈕' },
+                { title: '成功申請 gametower 帳號', icon: 'check-circle', desc: '填寫基本資料，完成 gametower 帳號註冊' },
+                { title: '成功開通遊戲帳號', icon: 'gamepad-2', desc: '帳號申請成功後，即可開通遊戲帳號開始遊玩' },
+            ];
+
+            return (
+                <div className="min-h-screen">
+                    <Navbar />
+
+                    {/* ═══ HERO — 下載區 ═══ */}
+                    <section id="download-section" className="hero-gradient relative overflow-hidden pt-32 pb-32">
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                            <div className="absolute top-24 left-10 text-7xl opacity-20 float-anim">📱</div>
+                            <div className="absolute top-36 right-16 text-8xl opacity-15 float-anim-delay">🎮</div>
+                            <div className="absolute bottom-32 left-1/4 text-6xl opacity-20 float-anim">⬇️</div>
+                        </div>
+
+                        <div className="max-w-7xl mx-auto px-6 relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                            {/* 左：下載資訊 */}
+                            <div className="text-center lg:text-left">
+                                <div className="mb-6 inline-flex items-center bg-white/20 backdrop-blur-md rounded-full px-5 py-2 text-white text-sm font-bold">
+                                    <span className="mr-2">🆓</span> 完全免費下載
+                                </div>
+                                <h1 className="text-4xl md:text-6xl font-black text-white mb-4 tracking-tight drop-shadow-lg">
+                                    立即下載<br/>
+                                    <span className="text-amber-300">全民猜猜猜</span>
+                                </h1>
+                                <p className="text-xl text-white/80 mb-10 leading-relaxed">
+                                    支援 iOS 與 Android 雙平台<br/>
+                                    立即加入 85 萬玩家的行列！
+                                </p>
+
+                                <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
+                                    <a href="https://itunes.apple.com/us/app/quan-min-cai-cai-cai/id702649687?ls=1&mt=8"
+                                       className="bg-white text-gray-900 px-8 py-4 rounded-2xl font-black text-lg shadow-2xl shadow-black/20 hover:scale-105 transition-all flex items-center justify-center gap-3 pulse-ring">
+                                        <svg className="w-8 h-8" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                                        <div className="text-left">
+                                            <div className="text-[10px] font-medium opacity-60">Download on the</div>
+                                            <div className="text-base font-black -mt-0.5">App Store</div>
+                                        </div>
+                                    </a>
+                                    <a href="https://play.google.com/store/apps/details?id=com.igs.QuizKing"
+                                       className="bg-gray-900 text-white px-8 py-4 rounded-2xl font-black text-lg shadow-2xl shadow-black/20 hover:scale-105 transition-all flex items-center justify-center gap-3 border border-white/10">
+                                        <svg className="w-7 h-7" viewBox="0 0 24 24" fill="currentColor"><path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/></svg>
+                                        <div className="text-left">
+                                            <div className="text-[10px] font-medium opacity-60">GET IT ON</div>
+                                            <div className="text-base font-black -mt-0.5">Google Play</div>
+                                        </div>
+                                    </a>
+                                </div>
+
+                                {/* 評分 */}
+                                <div className="flex items-center gap-4 justify-center lg:justify-start">
+                                    <div className="flex -space-x-2">
+                                        {['😊','😄','🥰','😎','🤩'].map((e,i) => (
+                                            <div key={i} className="w-9 h-9 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-base border-2 border-white/30">{e}</div>
+                                        ))}
+                                    </div>
+                                    <div className="text-white/80">
+                                        <div className="text-sm font-bold">⭐ 4.8 / 5.0</div>
+                                        <div className="text-xs opacity-70">12,500+ 則好評</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 右：手機模擬 + QR Code */}
+                            <div className="flex justify-center">
+                                <div className="relative">
+                                    {/* 手機外框 */}
+                                    <div className="w-64 h-[440px] bg-gradient-to-b from-gray-800 to-gray-900 rounded-[3rem] shadow-2xl shadow-black/30 p-3 border border-gray-600">
+                                        <div className="w-full h-full bg-gradient-to-b from-emerald-100 to-blue-100 rounded-[2.5rem] flex flex-col items-center justify-center p-6 space-y-4 relative overflow-hidden">
+                                            <div className="absolute top-0 left-0 right-0 h-8 bg-gray-800 rounded-t-[2.5rem] flex items-center justify-center">
+                                                <div className="w-16 h-4 bg-gray-900 rounded-full"></div>
+                                            </div>
+                                            <span className="text-6xl mt-4">🧠</span>
+                                            <span className="font-black text-gray-800 text-xl text-center">全民猜猜猜</span>
+                                            <span className="text-sm text-gray-500 text-center">Quiz King</span>
+                                            <div className="w-32 h-32 bg-white rounded-2xl shadow-lg flex items-center justify-center p-3 border border-gray-100">
+                                                {/* QR Code 模擬 */}
+                                                <div className="w-full h-full grid grid-cols-8 grid-rows-8 gap-0.5">
+                                                    {Array.from({length:64}).map((_,i) => (
+                                                        <div key={i} className={`rounded-[1px] ${Math.random()>0.5?'bg-gray-800':'bg-white'}`}></div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <span className="text-xs text-gray-400">掃描 QR Code 下載</span>
+                                        </div>
+                                    </div>
+
+                                    {/* 浮動裝飾 */}
+                                    <div className="absolute -bottom-4 -left-8 bg-white rounded-2xl px-4 py-2 shadow-xl flex items-center gap-2 bounce-in">
+                                        <span className="text-xl">🆓</span>
+                                        <span className="text-xs font-bold text-gray-700">免費下載</span>
+                                    </div>
+                                    <div className="absolute -top-4 -right-6 bg-white rounded-2xl px-4 py-2 shadow-xl flex items-center gap-2 bounce-in" style={{animationDelay:'0.3s'}}>
+                                        <span className="text-xl">📱</span>
+                                        <span className="text-xs font-bold text-gray-700">雙平台</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <svg className="absolute bottom-0 left-0 w-full" viewBox="0 0 1440 120" preserveAspectRatio="none">
+                            <path fill="#f0fdf4" d="M0,64 C360,120 1080,0 1440,64 L1440,120 L0,120 Z" opacity="0.5"/>
+                            <path fill="#f0fdf4" d="M0,80 C480,30 960,110 1440,60 L1440,120 L0,120 Z"/>
+                        </svg>
+                    </section>
+
+                    {/* ═══ 會員申請流程 ═══ */}
+                    <section className="py-24 px-6 bg-gradient-to-b from-emerald-50/50 to-white">
+                        <div className="max-w-5xl mx-auto">
+                            <div className="text-center mb-16">
+                                <span className="inline-block bg-emerald-100 text-emerald-700 text-sm font-bold px-4 py-1.5 rounded-full mb-4">👤 加入會員</span>
+                                <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">
+                                    三步驟，<span className="text-gradient">開始遊玩</span>
+                                </h2>
+                                <p className="text-lg text-gray-500">申請 gametower 帳號，享受完整遊戲體驗</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+                                {steps.map((s, idx) => (
+                                    <div key={idx}
+                                         onClick={() => setRegisterStep(idx)}
+                                         className={`card-hover cursor-pointer rounded-3xl p-8 text-center border-2 transition-all ${registerStep === idx ? 'bg-white border-emerald-400 shadow-xl shadow-emerald-200/50' : 'bg-white border-gray-100 shadow-lg shadow-gray-100/50'}`}>
+                                        <div className={`w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg transition-all ${registerStep === idx ? 'bg-gradient-to-br from-emerald-400 to-blue-500 scale-110' : 'bg-gradient-to-br from-gray-200 to-gray-300'}`}>
+                                            <Icon name={s.icon} size={28} className="text-white" />
+                                        </div>
+                                        <div className={`text-5xl font-black mb-2 transition-colors ${registerStep === idx ? 'text-emerald-500' : 'text-gray-200'}`}>
+                                            {String(idx + 1).padStart(2, '0')}
+                                        </div>
+                                        <h3 className="text-lg font-bold text-gray-900 mb-2">{s.title}</h3>
+                                        <p className="text-sm text-gray-500">{s.desc}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="text-center">
+                                <a href="https://www.gt.web/Games/Mobile/Member/GameRegister.aspx"
+                                   className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-blue-500 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/40 hover:scale-105 transition-all">
+                                    <Icon name="user-plus" size={22} /> 前往申請帳號
+                                </a>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* ═══ 系統需求 ═══ */}
+                    <section className="py-24 px-6 bg-white">
+                        <div className="max-w-5xl mx-auto">
+                            <div className="text-center mb-16">
+                                <span className="inline-block bg-blue-100 text-blue-700 text-sm font-bold px-4 py-1.5 rounded-full mb-4">⚙️ 系統需求</span>
+                                <h2 className="text-4xl md:text-5xl font-black text-gray-900">裝置相容性</h2>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {/* iOS */}
+                                <div className="card-hover bg-gray-50 rounded-3xl p-8 border border-gray-100">
+                                    <div className="flex items-center gap-4 mb-6">
+                                        <div className="w-14 h-14 bg-gradient-to-br from-gray-700 to-gray-900 rounded-2xl flex items-center justify-center shadow-lg">
+                                            <svg className="w-7 h-7 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-black text-gray-900">iOS 版</h3>
+                                            <span className="text-sm text-gray-500">iPhone / iPad</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {[
+                                            { label: '系統需求', value: 'iOS 12.0 或以上' },
+                                            { label: '容量大小', value: '約 150 MB' },
+                                            { label: '相容裝置', value: 'iPhone 6s 以上、iPad Air 2 以上' },
+                                            { label: '支援語言', value: '繁體中文、簡體中文、英文' },
+                                        ].map(item => (
+                                            <div key={item.label} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
+                                                <span className="text-sm text-gray-500">{item.label}</span>
+                                                <span className="text-sm font-bold text-gray-700">{item.value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <a href="https://itunes.apple.com/us/app/quan-min-cai-cai-cai/id702649687?ls=1&mt=8"
+                                       className="mt-6 w-full block text-center bg-gray-900 text-white py-3 rounded-xl font-bold hover:bg-gray-800 transition-colors">
+                                        前往 App Store →
+                                    </a>
+                                </div>
+
+                                {/* Android */}
+                                <div className="card-hover bg-gray-50 rounded-3xl p-8 border border-gray-100">
+                                    <div className="flex items-center gap-4 mb-6">
+                                        <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg">
+                                            <svg className="w-7 h-7 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.5,12.92 20.16,13.19L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z"/></svg>
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-black text-gray-900">Android 版</h3>
+                                            <span className="text-sm text-gray-500">手機 / 平板</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {[
+                                            { label: '系統需求', value: 'Android 5.0 或以上' },
+                                            { label: '容量大小', value: '約 120 MB' },
+                                            { label: '相容裝置', value: '大部分 Android 裝置' },
+                                            { label: '支援語言', value: '繁體中文、簡體中文、英文' },
+                                        ].map(item => (
+                                            <div key={item.label} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-0">
+                                                <span className="text-sm text-gray-500">{item.label}</span>
+                                                <span className="text-sm font-bold text-gray-700">{item.value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <a href="https://play.google.com/store/apps/details?id=com.igs.QuizKing"
+                                       className="mt-6 w-full block text-center bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-500 transition-colors">
+                                        前往 Google Play →
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* ═══ 社群分享 ═══ */}
+                    <section className="py-20 px-6 bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-500">
+                        <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
+                            <div className="flex items-center gap-6 text-white">
+                                <div className="w-20 h-20 bg-white/20 rounded-2xl flex items-center justify-center text-4xl flex-shrink-0">📘</div>
+                                <div>
+                                    <h3 className="text-2xl font-black mb-1">加入官方粉絲團</h3>
+                                    <p className="text-blue-100">掌握最新活動消息、題庫更新與限時挑戰！</p>
+                                    <div className="mt-2 text-sm text-blue-200 font-medium">👍 15,000+ 人說讚</div>
+                                </div>
+                            </div>
+                            <a href="#" className="bg-white text-blue-600 px-8 py-3.5 rounded-2xl font-bold hover:bg-blue-50 transition-colors shadow-lg flex items-center gap-2 whitespace-nowrap">
+                                <Icon name="external-link" size={18} /> 前往粉絲專頁
+                            </a>
+                        </div>
+                    </section>
+
+                    <Footer />
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>

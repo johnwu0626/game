@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全民猜猜猜 | 最好玩的益智遊戲</title>
+    <meta name="description" content="容易上癮5分鐘就可以變聰明的全民益智遊戲！知識領域廣泛，透過簡單的觸摸、反應速度的競賽，成為朋友中最聰明的人！">
+    <!-- OG Meta for Facebook -->
+    <meta property="og:title" content="全民猜猜猜 | 最好玩的益智遊戲">
+    <meta property="og:description" content="另一種流行的遊戲競爭風貌，知識領域廣泛必須多方涉略，才能成為最後贏家！">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="images/hero-banner.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Inter"', '"Noto Sans TC"', 'system-ui', 'sans-serif'] },
+                    colors: {
+                        primary: { 50:'#ecfdf5', 100:'#d1fae5', 200:'#a7f3d0', 300:'#6ee7b7', 400:'#34d399', 500:'#10b981', 600:'#059669', 700:'#047857' },
+                        sky: { 50:'#eff6ff', 100:'#dbeafe', 200:'#bfdbfe', 300:'#93c5fd', 400:'#60a5fa', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8' },
+                        accent: { 400:'#fbbf24', 500:'#f59e0b', 600:'#d97706' },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Inter', 'Noto Sans TC', system-ui, sans-serif; scroll-behavior: smooth; }
+        .hero-gradient { background: linear-gradient(135deg, #10b981 0%, #3b82f6 50%, #6366f1 100%); }
+        .hero-gradient-soft { background: linear-gradient(135deg, #d1fae5 0%, #dbeafe 50%, #e0e7ff 100%); }
+        .float-anim { animation: floatY 3s ease-in-out infinite; }
+        .float-anim-delay { animation: floatY 3s ease-in-out 1.5s infinite; }
+        .float-anim-slow { animation: floatY 4s ease-in-out 0.7s infinite; }
+        @keyframes floatY { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+        @keyframes bounceIn { 0%{opacity:0;transform:scale(0.3)} 50%{opacity:1;transform:scale(1.05)} 70%{transform:scale(0.95)} 100%{transform:scale(1)} }
+        @keyframes slideUp { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes wiggle { 0%,100%{transform:rotate(0deg)} 25%{transform:rotate(-5deg)} 75%{transform:rotate(5deg)} }
+        .bounce-in { animation: bounceIn 0.8s cubic-bezier(0.68,-0.55,0.265,1.55) forwards; }
+        .slide-up { animation: slideUp 0.6s ease-out forwards; }
+        .wiggle { animation: wiggle 2s ease-in-out infinite; }
+        .card-hover:hover { transform: translateY(-8px) scale(1.03); box-shadow: 0 20px 60px -12px rgba(16,185,129,0.25); }
+        .card-hover { transition: all 0.4s cubic-bezier(0.4,0,0.2,1); }
+        .glass { background: rgba(255,255,255,0.8); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.6); }
+        .shine { background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%); }
+        @keyframes pulse-ring { 0%{box-shadow:0 0 0 0 rgba(16,185,129,0.4)} 70%{box-shadow:0 0 0 15px rgba(16,185,129,0)} 100%{box-shadow:0 0 0 0 rgba(16,185,129,0)} }
+        .pulse-ring { animation: pulse-ring 2s infinite; }
+        ::-webkit-scrollbar{width:8px} ::-webkit-scrollbar-track{background:#ecfdf5}
+        ::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#10b981,#3b82f6);border-radius:4px}
+        .text-gradient { background: linear-gradient(135deg, #10b981, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    </style>
+</head>
+<body class="bg-emerald-50/30">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Lucide Icon 組件
+        const Icon = ({ name, className = '', size = 24 }) => {
+            const lucideInstance = window.lucide || {};
+            let iconData = lucideInstance.icons
+                ? (lucideInstance.icons[name] || lucideInstance.icons[name.charAt(0).toLowerCase() + name.slice(1)])
+                : null;
+            if (!iconData) return <div style={{ width: size, height: size }} className={className}></div>;
+            const [tag, attrs, children] = iconData;
+            const safeChildren = Array.isArray(children) ? children : [];
+            return React.createElement(tag, {
+                ...attrs, width: size, height: size, className,
+                dangerouslySetInnerHTML: {
+                    __html: safeChildren.map(child => {
+                        const [cTag, cAttrs] = child;
+                        const attrStr = Object.entries(cAttrs).map(([k, v]) => `${k}="${v}"`).join(' ');
+                        return `<${cTag} ${attrStr}></${cTag}>`;
+                    }).join('')
+                }
+            });
+        };
+
+        // ── 遊戲特色資料 ──
+        const FEATURES = [
+            {
+                title: '知識領域廣泛',
+                desc: '超多樣化題目，所有參賽者都必須要多方涉略才能成為最後贏家！涵蓋科學、歷史、地理、體育、音樂等各大領域。',
+                img: 'images/feature-knowledge.png',
+                icon: 'brain',
+                color: 'from-emerald-400 to-teal-500',
+                bgColor: 'bg-emerald-50'
+            },
+            {
+                title: '誰是聰明王？',
+                desc: '結合 gametower 平台、Facebook 等社群好友一同競賽，每週一清除排名榜名次！想蟬連冠軍寶座？哪有那麼簡單！',
+                img: 'images/feature-champion.png',
+                icon: 'trophy',
+                color: 'from-blue-400 to-indigo-500',
+                bgColor: 'bg-blue-50'
+            }
+        ];
+
+        // ── 數據統計 ──
+        const STATS = [
+            { label: '累計下載數', value: '850,000+', icon: 'download', color: 'text-emerald-500', bg: 'bg-emerald-100' },
+            { label: '題目數量', value: '50,000+', icon: 'file-question', color: 'text-blue-500', bg: 'bg-blue-100' },
+            { label: '每日對戰場次', value: '120,000+', icon: 'swords', color: 'text-purple-500', bg: 'bg-purple-100' },
+            { label: '玩家好評', value: '4.8 ★', icon: 'star', color: 'text-amber-500', bg: 'bg-amber-100' },
+        ];
+
+        // ── 玩法預覽 ──
+        const MODES = [
+            { name: '個人競賽', icon: 'user', desc: '挑戰自我，衝刺 combo 數', color: 'from-emerald-400 to-green-500' },
+            { name: '隨機競賽', icon: 'shuffle', desc: '隨機出題，好友排名 PK', color: 'from-blue-400 to-cyan-500' },
+            { name: '世界競賽', icon: 'globe', desc: '全球即時連線大亂鬥', color: 'from-purple-400 to-indigo-500' },
+        ];
+
+        // ── 導覽列 ──
+        function Navbar() {
+            const [scrolled, setScrolled] = useState(false);
+            const [mobileOpen, setMobileOpen] = useState(false);
+            useEffect(() => {
+                const h = () => setScrolled(window.scrollY > 50);
+                window.addEventListener('scroll', h);
+                return () => window.removeEventListener('scroll', h);
+            }, []);
+            const links = [
+                { href: 'index.html', label: '首頁', active: true },
+                { href: 'gameplay.html', label: '玩法說明' },
+                { href: 'download.html', label: '下載遊戲' },
+            ];
+            return (
+                <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/90 backdrop-blur-xl shadow-lg shadow-emerald-100/50' : 'bg-transparent'}`}>
+                    <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+                        <a href="index.html" className="flex items-center space-x-2 group">
+                            <span className="text-3xl group-hover:animate-bounce">🧠</span>
+                            <span className={`text-xl font-black tracking-tight transition-colors ${scrolled ? 'text-emerald-600' : 'text-white'}`}>全民猜猜猜</span>
+                        </a>
+                        {/* Desktop */}
+                        <div className="hidden md:flex items-center space-x-1">
+                            {links.map(l => (
+                                <a key={l.href} href={l.href}
+                                   className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${l.active ? (scrolled ? 'bg-emerald-100 text-emerald-700' : 'bg-white/20 text-white') : (scrolled ? 'text-gray-600 hover:text-emerald-600 hover:bg-emerald-50' : 'text-white/80 hover:text-white hover:bg-white/10')}`}>
+                                    {l.label}
+                                </a>
+                            ))}
+                            <a href="download.html" className="ml-4 bg-gradient-to-r from-emerald-500 to-blue-500 text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-105 transition-all">
+                                立即下載 🎮
+                            </a>
+                        </div>
+                        {/* Mobile */}
+                        <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2">
+                            <Icon name={mobileOpen ? 'x' : 'menu'} size={24} className={scrolled ? 'text-gray-700' : 'text-white'} />
+                        </button>
+                    </div>
+                    {mobileOpen && (
+                        <div className="md:hidden bg-white/95 backdrop-blur-xl border-t border-emerald-100 px-6 py-4 space-y-2">
+                            {links.map(l => (
+                                <a key={l.href} href={l.href} onClick={() => setMobileOpen(false)}
+                                   className={`block px-4 py-3 rounded-xl font-bold transition-colors ${l.active ? 'bg-emerald-50 text-emerald-700' : 'text-gray-600 hover:bg-emerald-50 hover:text-emerald-600'}`}>
+                                    {l.label}
+                                </a>
+                            ))}
+                            <a href="download.html" className="block text-center bg-gradient-to-r from-emerald-500 to-blue-500 text-white px-6 py-3 rounded-xl font-bold mt-2">
+                                立即下載
+                            </a>
+                        </div>
+                    )}
+                </nav>
+            );
+        }
+
+        // ── Footer ──
+        function Footer() {
+            return (
+                <footer className="bg-gray-900 text-gray-400 py-16 px-6">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
+                            <div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="text-2xl">🧠</span>
+                                    <span className="text-xl font-black text-white">全民猜猜猜</span>
+                                </div>
+                                <p className="text-sm leading-relaxed">容易上癮 5 分鐘就可以變聰明的全民益智遊戲！知識領域廣泛，成為朋友中最聰明的人！</p>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white mb-4">快速連結</h4>
+                                <div className="space-y-2 text-sm">
+                                    <a href="index.html" className="block hover:text-emerald-400 transition-colors">首頁</a>
+                                    <a href="gameplay.html" className="block hover:text-emerald-400 transition-colors">玩法說明</a>
+                                    <a href="download.html" className="block hover:text-emerald-400 transition-colors">下載遊戲</a>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white mb-4">下載連結</h4>
+                                <div className="space-y-2 text-sm">
+                                    <a href="https://itunes.apple.com/us/app/quan-min-cai-cai-cai/id702649687?ls=1&mt=8" className="block hover:text-emerald-400 transition-colors flex items-center gap-2"><Icon name="smartphone" size={14} /> iOS 版</a>
+                                    <a href="https://play.google.com/store/apps/details?id=com.igs.QuizKing" className="block hover:text-emerald-400 transition-colors flex items-center gap-2"><Icon name="smartphone" size={14} /> Android 版</a>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white mb-4">聯繫我們</h4>
+                                <div className="space-y-2 text-sm">
+                                    <a href="https://www.gt.web" className="flex items-center gap-2 hover:text-emerald-400 transition-colors"><Icon name="globe" size={14} /> gametower 官網</a>
+                                    <a href="#" className="flex items-center gap-2 hover:text-emerald-400 transition-colors"><Icon name="message-circle" size={14} /> Facebook 粉絲團</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="border-t border-gray-800 pt-8 text-center text-sm">
+                            © 2026 全民猜猜猜 by gametower. All rights reserved.
+                        </div>
+                    </div>
+                </footer>
+            );
+        }
+
+        // ── 主應用 ──
+        function App() {
+            const [heroSlide, setHeroSlide] = useState(0);
+
+            useEffect(() => {
+                const timer = setInterval(() => setHeroSlide(s => (s + 1) % 3), 4000);
+                return () => clearInterval(timer);
+            }, []);
+
+            const heroSlides = [
+                { title: '全民猜猜猜', sub: '容易上癮 5 分鐘就可以變聰明！', emoji: '🧠' },
+                { title: '挑戰你的知識極限', sub: '科學、歷史、地理、體育…你準備好了嗎？', emoji: '💡' },
+                { title: '誰是最聰明的人？', sub: '和全世界玩家即時連線比賽！', emoji: '🏆' },
+            ];
+
+            return (
+                <div className="min-h-screen">
+                    <Navbar />
+
+                    {/* ═══ HERO ═══ */}
+                    <section className="hero-gradient relative overflow-hidden min-h-[92vh] flex items-center">
+                        {/* 裝飾浮動元素 */}
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                            <div className="absolute top-24 left-10 text-7xl opacity-20 float-anim">❓</div>
+                            <div className="absolute top-36 right-16 text-8xl opacity-15 float-anim-delay">💡</div>
+                            <div className="absolute bottom-32 left-1/4 text-6xl opacity-20 float-anim-slow">🎯</div>
+                            <div className="absolute bottom-48 right-1/4 text-5xl opacity-15 float-anim">⭐</div>
+                            <div className="absolute top-1/2 left-10 text-4xl opacity-10 float-anim-delay">🏆</div>
+                            <div className="absolute top-1/3 left-1/2 w-96 h-96 bg-white/10 rounded-full blur-3xl"></div>
+                            <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-blue-300/10 rounded-full blur-3xl"></div>
+                        </div>
+
+                        <div className="max-w-7xl mx-auto px-6 py-32 relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                            {/* 左側文字 */}
+                            <div className="text-center lg:text-left">
+                                <div className="mb-6 inline-flex items-center bg-white/20 backdrop-blur-md rounded-full px-5 py-2 text-white text-sm font-bold">
+                                    <span className="mr-2 wiggle inline-block">🎮</span> 最受歡迎的益智遊戲
+                                </div>
+
+                                {heroSlides.map((slide, idx) => (
+                                    <div key={idx} className={`transition-all duration-700 ${heroSlide === idx ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 absolute pointer-events-none'}`}>
+                                        {heroSlide === idx && (
+                                            <>
+                                                <div className="text-7xl mb-4">{slide.emoji}</div>
+                                                <h1 className="text-5xl md:text-6xl font-black text-white mb-4 tracking-tight drop-shadow-lg leading-tight">
+                                                    {slide.title}
+                                                </h1>
+                                                <p className="text-xl md:text-2xl text-white/90 font-medium mb-8 leading-relaxed">
+                                                    {slide.sub}
+                                                </p>
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
+
+                                <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-6">
+                                    <a href="download.html" className="bg-white text-emerald-600 px-8 py-4 rounded-2xl font-black text-lg shadow-2xl shadow-black/20 hover:scale-105 transition-all flex items-center justify-center gap-2 pulse-ring">
+                                        <Icon name="download" size={22} /> 免費下載
+                                    </a>
+                                    <a href="gameplay.html" className="bg-white/20 backdrop-blur text-white border-2 border-white/30 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-white/30 hover:scale-105 transition-all flex items-center justify-center gap-2">
+                                        <Icon name="play-circle" size={22} /> 了解玩法
+                                    </a>
+                                </div>
+
+                                {/* 輪播指示器 */}
+                                <div className="flex gap-2 justify-center lg:justify-start">
+                                    {[0,1,2].map(i => (
+                                        <button key={i} onClick={() => setHeroSlide(i)}
+                                            className={`h-3 rounded-full transition-all ${heroSlide === i ? 'bg-white w-10' : 'bg-white/40 w-3 hover:bg-white/60'}`} />
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 右側圖片 */}
+                            <div className="hidden lg:flex justify-center">
+                                <div className="relative">
+                                    <div className="w-80 h-80 rounded-[3rem] overflow-hidden shadow-2xl shadow-black/20 border-4 border-white/20 rotate-3 hover:rotate-0 transition-transform duration-500">
+                                        <img src="images/hero-banner.png" alt="全民猜猜猜" className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="absolute -bottom-6 -left-6 bg-white rounded-2xl px-5 py-3 shadow-xl flex items-center gap-2 bounce-in">
+                                        <span className="text-2xl">🔥</span>
+                                        <div>
+                                            <div className="text-sm font-bold text-gray-800">85 萬+</div>
+                                            <div className="text-xs text-gray-500">累計下載</div>
+                                        </div>
+                                    </div>
+                                    <div className="absolute -top-4 -right-4 bg-white rounded-2xl px-5 py-3 shadow-xl flex items-center gap-2 bounce-in" style={{animationDelay:'0.3s'}}>
+                                        <span className="text-2xl">⭐</span>
+                                        <div>
+                                            <div className="text-sm font-bold text-gray-800">4.8 分</div>
+                                            <div className="text-xs text-gray-500">玩家好評</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 波浪底部 */}
+                        <svg className="absolute bottom-0 left-0 w-full" viewBox="0 0 1440 120" preserveAspectRatio="none">
+                            <path fill="#f0fdf4" d="M0,64 C360,120 1080,0 1440,64 L1440,120 L0,120 Z" opacity="0.5"/>
+                            <path fill="#f0fdf4" d="M0,80 C480,30 960,110 1440,60 L1440,120 L0,120 Z"/>
+                        </svg>
+                    </section>
+
+                    {/* ═══ 遊戲簡介 ═══ */}
+                    <section className="py-24 px-6 bg-gradient-to-b from-emerald-50/50 to-white">
+                        <div className="max-w-4xl mx-auto text-center">
+                            <span className="inline-block bg-emerald-100 text-emerald-700 text-sm font-bold px-4 py-1.5 rounded-full mb-6">🎯 遊戲簡介</span>
+                            <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-6">
+                                另一種流行的<span className="text-gradient">遊戲競爭風貌</span>
+                            </h2>
+                            <p className="text-lg text-gray-600 leading-relaxed max-w-3xl mx-auto mb-8">
+                                容易上癮 5 分鐘就可以變聰明的全民益智遊戲！透過簡單的觸摸、反應速度的競賽！
+                                知識領域廣泛，所有參賽者都必須要多方涉略才能成為最後贏家！
+                            </p>
+                            <p className="text-xl font-bold text-emerald-600 mb-2">
+                                想知道…您的朋友中誰最聰明嗎？
+                            </p>
+                            <p className="text-xl font-bold text-blue-600">
+                                想成為…朋友中最聰明的人嗎！
+                            </p>
+                            <p className="text-lg text-gray-500 mt-4">快來享受遊戲樂趣和輕鬆的學習吧！</p>
+                        </div>
+                    </section>
+
+                    {/* ═══ 遊戲特色 ═══ */}
+                    <section className="py-24 px-6 bg-white">
+                        <div className="max-w-7xl mx-auto">
+                            <div className="text-center mb-16">
+                                <span className="inline-block bg-blue-100 text-blue-700 text-sm font-bold px-4 py-1.5 rounded-full mb-4">✨ 遊戲特色</span>
+                                <h2 className="text-4xl md:text-5xl font-black text-gray-900">為什麼選擇<span className="text-gradient">全民猜猜猜</span>？</h2>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {FEATURES.map((f, idx) => (
+                                    <div key={idx} className={`card-hover ${f.bgColor} rounded-3xl overflow-hidden border border-gray-100`}>
+                                        <div className="p-8">
+                                            <div className={`w-16 h-16 bg-gradient-to-br ${f.color} rounded-2xl flex items-center justify-center mb-6 shadow-lg`}>
+                                                <Icon name={f.icon} size={32} className="text-white" />
+                                            </div>
+                                            <h3 className="text-2xl font-black text-gray-900 mb-3">{f.title}</h3>
+                                            <p className="text-gray-600 leading-relaxed mb-6">{f.desc}</p>
+                                        </div>
+                                        <div className="px-8 pb-8">
+                                            <div className="rounded-2xl overflow-hidden shadow-lg border border-white/50">
+                                                <img src={f.img} alt={f.title} className="w-full h-48 object-cover hover:scale-105 transition-transform duration-500" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* ═══ 玩法預覽 ═══ */}
+                    <section className="py-24 px-6 hero-gradient-soft">
+                        <div className="max-w-7xl mx-auto">
+                            <div className="text-center mb-16">
+                                <span className="inline-block bg-purple-100 text-purple-700 text-sm font-bold px-4 py-1.5 rounded-full mb-4">🎮 玩法預覽</span>
+                                <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">三大競賽模式</h2>
+                                <p className="text-lg text-gray-500">從個人挑戰到全球對戰，找到最適合你的方式！</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+                                {MODES.map((m, idx) => (
+                                    <div key={idx} className="card-hover bg-white rounded-3xl p-8 text-center shadow-lg shadow-gray-200/50 border border-gray-100 group">
+                                        <div className={`w-20 h-20 bg-gradient-to-br ${m.color} rounded-3xl mx-auto mb-6 flex items-center justify-center shadow-xl group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
+                                            <Icon name={m.icon} size={36} className="text-white" />
+                                        </div>
+                                        <h3 className="text-xl font-black text-gray-900 mb-2">{m.name}</h3>
+                                        <p className="text-gray-500 mb-6">{m.desc}</p>
+                                        <a href="gameplay.html" className="inline-flex items-center gap-1 text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-colors">
+                                            了解更多 <Icon name="arrow-right" size={16} />
+                                        </a>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* ═══ 數據統計 ═══ */}
+                    <section className="py-24 px-6 bg-white">
+                        <div className="max-w-7xl mx-auto">
+                            <div className="text-center mb-16">
+                                <span className="inline-block bg-amber-100 text-amber-700 text-sm font-bold px-4 py-1.5 rounded-full mb-4">📊 亮眼數據</span>
+                                <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">用數字說話</h2>
+                            </div>
+
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
+                                {STATS.map(s => (
+                                    <div key={s.label} className="card-hover bg-white rounded-3xl p-8 text-center shadow-lg shadow-gray-100/50 border border-gray-100 group">
+                                        <div className={`w-16 h-16 ${s.bg} rounded-2xl mx-auto mb-4 flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                                            <Icon name={s.icon} size={28} className={s.color} />
+                                        </div>
+                                        <div className="text-3xl md:text-4xl font-black text-gray-900 mb-1">{s.value}</div>
+                                        <div className="text-sm text-gray-500 font-medium">{s.label}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* ═══ CTA ═══ */}
+                    <section className="hero-gradient py-20 px-6 text-center relative overflow-hidden">
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                            <div className="absolute top-10 left-20 text-5xl opacity-20 float-anim">🎮</div>
+                            <div className="absolute bottom-10 right-20 text-6xl opacity-15 float-anim-delay">🧠</div>
+                        </div>
+                        <div className="max-w-3xl mx-auto relative z-10">
+                            <span className="text-6xl mb-6 inline-block wiggle">🚀</span>
+                            <h2 className="text-4xl md:text-5xl font-black text-white mb-4">準備好變聰明了嗎？</h2>
+                            <p className="text-xl text-white/80 mb-10">立即下載全民猜猜猜，用 5 分鐘證明你是最聰明的人！</p>
+                            <div className="flex flex-col sm:flex-row justify-center gap-4">
+                                <a href="download.html" className="bg-white text-emerald-600 px-10 py-4 rounded-2xl font-black text-lg shadow-2xl hover:scale-105 transition-all flex items-center justify-center gap-2">
+                                    <Icon name="download" size={24} /> 免費下載
+                                </a>
+                                <a href="gameplay.html" className="border-2 border-white/50 text-white px-10 py-4 rounded-2xl font-bold text-lg hover:bg-white/10 transition-all flex items-center justify-center gap-2">
+                                    <Icon name="play-circle" size={24} /> 玩法介紹
+                                </a>
+                            </div>
+                        </div>
+                    </section>
+
+                    <Footer />
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>

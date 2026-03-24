@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>玩法說明 | 全民猜猜猜</title>
+    <meta name="description" content="全民猜猜猜三大競賽模式：個人競賽、隨機競賽、世界競賽，每一種都有獨特的挑戰和樂趣！">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Inter"', '"Noto Sans TC"', 'system-ui', 'sans-serif'] },
+                    colors: {
+                        primary: { 50:'#ecfdf5', 100:'#d1fae5', 200:'#a7f3d0', 300:'#6ee7b7', 400:'#34d399', 500:'#10b981', 600:'#059669', 700:'#047857' },
+                        sky: { 50:'#eff6ff', 100:'#dbeafe', 200:'#bfdbfe', 300:'#93c5fd', 400:'#60a5fa', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8' },
+                        accent: { 400:'#fbbf24', 500:'#f59e0b', 600:'#d97706' },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Inter', 'Noto Sans TC', system-ui, sans-serif; scroll-behavior: smooth; }
+        .hero-gradient { background: linear-gradient(135deg, #10b981 0%, #3b82f6 50%, #6366f1 100%); }
+        .float-anim { animation: floatY 3s ease-in-out infinite; }
+        .float-anim-delay { animation: floatY 3s ease-in-out 1.5s infinite; }
+        @keyframes floatY { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+        @keyframes slideUp { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes wiggle { 0%,100%{transform:rotate(0deg)} 25%{transform:rotate(-5deg)} 75%{transform:rotate(5deg)} }
+        .slide-up { animation: slideUp 0.6s ease-out forwards; }
+        .wiggle { animation: wiggle 2s ease-in-out infinite; }
+        .card-hover:hover { transform: translateY(-6px); box-shadow: 0 20px 60px -12px rgba(16,185,129,0.2); }
+        .card-hover { transition: all 0.4s cubic-bezier(0.4,0,0.2,1); }
+        .text-gradient { background: linear-gradient(135deg, #10b981, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        ::-webkit-scrollbar{width:8px} ::-webkit-scrollbar-track{background:#ecfdf5}
+        ::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#10b981,#3b82f6);border-radius:4px}
+        .mode-card { position: relative; overflow: hidden; }
+        .mode-card::before { content:''; position:absolute; top:0; left:0; right:0; height:6px; }
+        .mode-green::before { background: linear-gradient(90deg, #10b981, #34d399); }
+        .mode-blue::before { background: linear-gradient(90deg, #3b82f6, #60a5fa); }
+        .mode-purple::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+    </style>
+</head>
+<body class="bg-emerald-50/30">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const Icon = ({ name, className = '', size = 24 }) => {
+            const lucideInstance = window.lucide || {};
+            let iconData = lucideInstance.icons
+                ? (lucideInstance.icons[name] || lucideInstance.icons[name.charAt(0).toLowerCase() + name.slice(1)])
+                : null;
+            if (!iconData) return <div style={{ width: size, height: size }} className={className}></div>;
+            const [tag, attrs, children] = iconData;
+            const safeChildren = Array.isArray(children) ? children : [];
+            return React.createElement(tag, {
+                ...attrs, width: size, height: size, className,
+                dangerouslySetInnerHTML: {
+                    __html: safeChildren.map(child => {
+                        const [cTag, cAttrs] = child;
+                        const attrStr = Object.entries(cAttrs).map(([k, v]) => `${k}="${v}"`).join(' ');
+                        return `<${cTag} ${attrStr}></${cTag}>`;
+                    }).join('')
+                }
+            });
+        };
+
+        // ── 三大模式資料 ──
+        const MODES = [
+            {
+                id: 'personal',
+                name: '個人競賽',
+                icon: 'user',
+                emoji: '🎯',
+                color: 'from-emerald-400 to-green-500',
+                cardClass: 'mode-green',
+                tagColor: 'bg-emerald-100 text-emerald-700',
+                img: 'images/mode-personal.png',
+                subtitle: '挑選你的擅長領域，衝刺 Combo！',
+                desc: '選擇您最擅長題目以答對正確率獲得分數，無限暢快的 combo 數，以機台破關為目標！衝吧～',
+                features: [
+                    { icon: 'target', text: '選擇擅長的題目分類' },
+                    { icon: 'zap', text: '追求最高 combo 連擊' },
+                    { icon: 'trophy', text: '以破關為最終目標' },
+                    { icon: 'bar-chart-3', text: '依正確率計算得分' },
+                ],
+                tips: '💡 小秘訣：先從擅長的領域開始，累積 combo 數可以獲得額外加分！'
+            },
+            {
+                id: 'random',
+                name: '隨機競賽',
+                icon: 'shuffle',
+                emoji: '🎲',
+                color: 'from-blue-400 to-cyan-500',
+                cardClass: 'mode-blue',
+                tagColor: 'bg-blue-100 text-blue-700',
+                img: 'images/mode-random.png',
+                subtitle: '隨機出題，與好友一較高下！',
+                desc: '更高難度的挑戰，隨機出題，好友間的排名、等級的競賽。小心！亂答題會使等級下降哦！',
+                features: [
+                    { icon: 'dice-5', text: '題目隨機出題，考驗全方位知識' },
+                    { icon: 'users', text: '好友間排名即時更新' },
+                    { icon: 'trending-up', text: '等級系統，越答越高' },
+                    { icon: 'alert-triangle', text: '注意！亂答會降級' },
+                ],
+                tips: '⚠️ 注意：不確定的題目寧可跳過，亂答會導致等級下降！'
+            },
+            {
+                id: 'world',
+                name: '世界競賽',
+                icon: 'globe',
+                emoji: '🌍',
+                color: 'from-purple-400 to-indigo-500',
+                cardClass: 'mode-purple',
+                tagColor: 'bg-purple-100 text-purple-700',
+                img: 'images/mode-world.png',
+                subtitle: '終極 Boss 關卡，全球即時 PK！',
+                desc: '終極 Boss 關卡，在此…你將開始與全世界玩家即時連線比賽，以獲得名譽徽章為榮耀吧！',
+                features: [
+                    { icon: 'wifi', text: '全球即時連線對戰' },
+                    { icon: 'medal', text: '爭奪名譽徽章' },
+                    { icon: 'swords', text: '頂尖玩家終極對決' },
+                    { icon: 'crown', text: '榮登世界排行榜' },
+                ],
+                tips: '🏆 終極挑戰：打敗全球好手，成為世界冠軍，贏得專屬名譽徽章！'
+            },
+        ];
+
+        // ── 導覽列 ──
+        function Navbar() {
+            const [scrolled, setScrolled] = useState(false);
+            const [mobileOpen, setMobileOpen] = useState(false);
+            useEffect(() => {
+                const h = () => setScrolled(window.scrollY > 50);
+                window.addEventListener('scroll', h);
+                return () => window.removeEventListener('scroll', h);
+            }, []);
+            const links = [
+                { href: 'index.html', label: '首頁' },
+                { href: 'gameplay.html', label: '玩法說明', active: true },
+                { href: 'download.html', label: '下載遊戲' },
+            ];
+            return (
+                <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/90 backdrop-blur-xl shadow-lg shadow-emerald-100/50' : 'bg-transparent'}`}>
+                    <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+                        <a href="index.html" className="flex items-center space-x-2 group">
+                            <span className="text-3xl group-hover:animate-bounce">🧠</span>
+                            <span className={`text-xl font-black tracking-tight transition-colors ${scrolled ? 'text-emerald-600' : 'text-white'}`}>全民猜猜猜</span>
+                        </a>
+                        <div className="hidden md:flex items-center space-x-1">
+                            {links.map(l => (
+                                <a key={l.href} href={l.href}
+                                   className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${l.active ? (scrolled ? 'bg-emerald-100 text-emerald-700' : 'bg-white/20 text-white') : (scrolled ? 'text-gray-600 hover:text-emerald-600 hover:bg-emerald-50' : 'text-white/80 hover:text-white hover:bg-white/10')}`}>
+                                    {l.label}
+                                </a>
+                            ))}
+                            <a href="download.html" className="ml-4 bg-gradient-to-r from-emerald-500 to-blue-500 text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-105 transition-all">
+                                立即下載 🎮
+                            </a>
+                        </div>
+                        <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2">
+                            <Icon name={mobileOpen ? 'x' : 'menu'} size={24} className={scrolled ? 'text-gray-700' : 'text-white'} />
+                        </button>
+                    </div>
+                    {mobileOpen && (
+                        <div className="md:hidden bg-white/95 backdrop-blur-xl border-t border-emerald-100 px-6 py-4 space-y-2">
+                            {links.map(l => (
+                                <a key={l.href} href={l.href} onClick={() => setMobileOpen(false)}
+                                   className={`block px-4 py-3 rounded-xl font-bold transition-colors ${l.active ? 'bg-emerald-50 text-emerald-700' : 'text-gray-600 hover:bg-emerald-50 hover:text-emerald-600'}`}>
+                                    {l.label}
+                                </a>
+                            ))}
+                        </div>
+                    )}
+                </nav>
+            );
+        }
+
+        // ── Footer ──
+        function Footer() {
+            return (
+                <footer className="bg-gray-900 text-gray-400 py-16 px-6">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
+                            <div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="text-2xl">🧠</span>
+                                    <span className="text-xl font-black text-white">全民猜猜猜</span>
+                                </div>
+                                <p className="text-sm leading-relaxed">容易上癮 5 分鐘就可以變聰明的全民益智遊戲！</p>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white mb-4">快速連結</h4>
+                                <div className="space-y-2 text-sm">
+                                    <a href="index.html" className="block hover:text-emerald-400 transition-colors">首頁</a>
+                                    <a href="gameplay.html" className="block hover:text-emerald-400 transition-colors">玩法說明</a>
+                                    <a href="download.html" className="block hover:text-emerald-400 transition-colors">下載遊戲</a>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white mb-4">下載連結</h4>
+                                <div className="space-y-2 text-sm">
+                                    <a href="https://itunes.apple.com/us/app/quan-min-cai-cai-cai/id702649687?ls=1&mt=8" className="block hover:text-emerald-400 transition-colors flex items-center gap-2"><Icon name="smartphone" size={14} /> iOS 版</a>
+                                    <a href="https://play.google.com/store/apps/details?id=com.igs.QuizKing" className="block hover:text-emerald-400 transition-colors flex items-center gap-2"><Icon name="smartphone" size={14} /> Android 版</a>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white mb-4">聯繫我們</h4>
+                                <div className="space-y-2 text-sm">
+                                    <a href="https://www.gt.web" className="flex items-center gap-2 hover:text-emerald-400 transition-colors"><Icon name="globe" size={14} /> gametower 官網</a>
+                                    <a href="#" className="flex items-center gap-2 hover:text-emerald-400 transition-colors"><Icon name="message-circle" size={14} /> Facebook 粉絲團</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="border-t border-gray-800 pt-8 text-center text-sm">
+                            © 2026 全民猜猜猜 by gametower. All rights reserved.
+                        </div>
+                    </div>
+                </footer>
+            );
+        }
+
+        // ── 模式詳細卡片 ──
+        function ModeSection({ mode, reversed }) {
+            return (
+                <div className={`mode-card ${mode.cardClass} bg-white rounded-3xl shadow-xl shadow-gray-200/50 overflow-hidden border border-gray-100`}>
+                    <div className={`grid grid-cols-1 lg:grid-cols-2 gap-0 ${reversed ? 'lg:direction-rtl' : ''}`}>
+                        {/* 圖片側 */}
+                        <div className={`relative ${reversed ? 'lg:order-2' : ''}`}>
+                            <div className={`h-full min-h-[300px] bg-gradient-to-br ${mode.color} p-8 flex items-center justify-center relative overflow-hidden`}>
+                                <div className="absolute inset-0 opacity-10">
+                                    <div className="absolute top-6 left-6 text-5xl float-anim">{mode.emoji}</div>
+                                    <div className="absolute bottom-6 right-6 text-4xl float-anim-delay">{mode.emoji}</div>
+                                </div>
+                                <div className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl shadow-black/20 border-4 border-white/20 relative z-10 hover:scale-105 transition-transform duration-500">
+                                    <img src={mode.img} alt={mode.name} className="w-full h-auto object-cover" />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 內容側 */}
+                        <div className={`p-8 lg:p-12 flex flex-col justify-center ${reversed ? 'lg:order-1' : ''}`}>
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className={`w-12 h-12 bg-gradient-to-br ${mode.color} rounded-xl flex items-center justify-center shadow-lg`}>
+                                    <Icon name={mode.icon} size={24} className="text-white" />
+                                </div>
+                                <span className={`${mode.tagColor} text-xs font-bold px-3 py-1 rounded-full`}>{mode.name}</span>
+                            </div>
+
+                            <h3 className="text-2xl lg:text-3xl font-black text-gray-900 mb-2">{mode.subtitle}</h3>
+                            <p className="text-gray-600 leading-relaxed mb-8">{mode.desc}</p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                                {mode.features.map((f, idx) => (
+                                    <div key={idx} className="flex items-center gap-3 group">
+                                        <div className={`w-10 h-10 bg-gradient-to-br ${mode.color} rounded-xl flex items-center justify-center flex-shrink-0 opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all`}>
+                                            <Icon name={f.icon} size={18} className="text-white" />
+                                        </div>
+                                        <span className="text-sm font-medium text-gray-700">{f.text}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                                <p className="text-sm text-gray-600">{mode.tips}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ── 主應用 ──
+        function App() {
+            return (
+                <div className="min-h-screen">
+                    <Navbar />
+
+                    {/* ═══ HERO ═══ */}
+                    <section className="hero-gradient relative overflow-hidden pt-32 pb-24">
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                            <div className="absolute top-24 left-10 text-6xl opacity-20 float-anim">🎯</div>
+                            <div className="absolute top-20 right-16 text-7xl opacity-15 float-anim-delay">🎲</div>
+                            <div className="absolute bottom-20 left-1/3 text-5xl opacity-20 float-anim">🌍</div>
+                        </div>
+                        <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
+                            <span className="text-6xl mb-4 inline-block wiggle">🎮</span>
+                            <h1 className="text-4xl md:text-6xl font-black text-white mb-4 tracking-tight drop-shadow-lg">
+                                三大競賽模式
+                            </h1>
+                            <p className="text-xl text-white/80 max-w-2xl mx-auto leading-relaxed">
+                                從個人挑戰到全球連線對戰，每一種模式都有獨特的策略與樂趣。選擇最適合你的方式，成為最聰明的人！
+                            </p>
+                        </div>
+                        <svg className="absolute bottom-0 left-0 w-full" viewBox="0 0 1440 120" preserveAspectRatio="none">
+                            <path fill="#f0fdf4" d="M0,64 C360,120 1080,0 1440,64 L1440,120 L0,120 Z" opacity="0.5"/>
+                            <path fill="#f0fdf4" d="M0,80 C480,30 960,110 1440,60 L1440,120 L0,120 Z"/>
+                        </svg>
+                    </section>
+
+                    {/* ═══ 模式快速導覽 ═══ */}
+                    <section className="py-16 px-6 bg-gradient-to-b from-emerald-50/50 to-white">
+                        <div className="max-w-5xl mx-auto">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {MODES.map(m => (
+                                    <a key={m.id} href={`#${m.id}`} className="card-hover bg-white rounded-2xl p-6 text-center border border-gray-100 shadow-md group">
+                                        <div className={`w-16 h-16 bg-gradient-to-br ${m.color} rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-all`}>
+                                            <Icon name={m.icon} size={28} className="text-white" />
+                                        </div>
+                                        <h3 className="text-lg font-black text-gray-900 mb-1">{m.name}</h3>
+                                        <p className="text-sm text-gray-500">{m.subtitle}</p>
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* ═══ 各模式詳細說明 ═══ */}
+                    <section className="py-16 px-6 bg-white">
+                        <div className="max-w-6xl mx-auto space-y-16">
+                            {MODES.map((mode, idx) => (
+                                <div key={mode.id} id={mode.id}>
+                                    <ModeSection mode={mode} reversed={idx % 2 === 1} />
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+
+                    {/* ═══ CTA ═══ */}
+                    <section className="hero-gradient py-20 px-6 text-center relative overflow-hidden">
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                            <div className="absolute top-10 left-20 text-5xl opacity-20 float-anim">🎮</div>
+                            <div className="absolute bottom-10 right-20 text-6xl opacity-15 float-anim-delay">🧠</div>
+                        </div>
+                        <div className="max-w-3xl mx-auto relative z-10">
+                            <span className="text-6xl mb-6 inline-block wiggle">🚀</span>
+                            <h2 className="text-4xl md:text-5xl font-black text-white mb-4">準備好迎接挑戰了嗎？</h2>
+                            <p className="text-xl text-white/80 mb-10">立即下載，選擇你的模式，向全世界證明你的實力！</p>
+                            <a href="download.html" className="inline-flex items-center gap-2 bg-white text-emerald-600 px-10 py-4 rounded-2xl font-black text-lg shadow-2xl hover:scale-105 transition-all">
+                                <Icon name="download" size={24} /> 免費下載
+                            </a>
+                        </div>
+                    </section>
+
+                    <Footer />
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
