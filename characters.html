@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>角色介紹 | 全民猜猜猜</title>
+    <meta name="description" content="認識全民猜猜猜的六大角色！每位角色都有獨特個性與專屬技能，選擇你的代表角色，開始你的益智之旅！">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Inter"', '"Noto Sans TC"', 'system-ui', 'sans-serif'] },
+                    colors: {
+                        primary: { 50:'#ecfdf5', 100:'#d1fae5', 200:'#a7f3d0', 300:'#6ee7b7', 400:'#34d399', 500:'#10b981', 600:'#059669', 700:'#047857' },
+                        sky: { 50:'#eff6ff', 100:'#dbeafe', 200:'#bfdbfe', 300:'#93c5fd', 400:'#60a5fa', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8' },
+                        accent: { 400:'#fbbf24', 500:'#f59e0b', 600:'#d97706' },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Inter', 'Noto Sans TC', system-ui, sans-serif; scroll-behavior: smooth; }
+        .hero-gradient { background: linear-gradient(135deg, #10b981 0%, #3b82f6 50%, #6366f1 100%); }
+        .float-anim { animation: floatY 3s ease-in-out infinite; }
+        .float-anim-delay { animation: floatY 3s ease-in-out 1.5s infinite; }
+        @keyframes floatY { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+        @keyframes bounceIn { 0%{opacity:0;transform:scale(0.3)} 50%{transform:scale(1.05)} 100%{transform:scale(1)} }
+        @keyframes wiggle { 0%,100%{transform:rotate(0deg)} 25%{transform:rotate(-5deg)} 75%{transform:rotate(5deg)} }
+        @keyframes slideUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+        .bounce-in { animation: bounceIn 0.8s cubic-bezier(0.68,-0.55,0.265,1.55) forwards; }
+        .wiggle { animation: wiggle 2s ease-in-out infinite; }
+        .slide-up { animation: slideUp 0.6s ease-out forwards; }
+        .card-hover:hover { transform: translateY(-8px) scale(1.02); }
+        .card-hover { transition: all 0.4s cubic-bezier(0.4,0,0.2,1); }
+        .text-gradient { background: linear-gradient(135deg, #10b981, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        ::-webkit-scrollbar{width:8px} ::-webkit-scrollbar-track{background:#ecfdf5}
+        ::-webkit-scrollbar-thumb{background:linear-gradient(180deg,#10b981,#3b82f6);border-radius:4px}
+        .char-card { cursor: pointer; }
+        .char-card:hover .char-img { transform: scale(1.1) rotate(3deg); }
+        .char-img { transition: transform 0.4s cubic-bezier(0.4,0,0.2,1); }
+        .skill-bar { background: linear-gradient(90deg, var(--bar-from), var(--bar-to)); transition: width 1s ease-out; }
+        .modal-overlay { background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); }
+    </style>
+</head>
+<body class="bg-emerald-50/30">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const Icon = ({ name, className = '', size = 24 }) => {
+            const lucideInstance = window.lucide || {};
+            let iconData = lucideInstance.icons
+                ? (lucideInstance.icons[name] || lucideInstance.icons[name.charAt(0).toLowerCase() + name.slice(1)])
+                : null;
+            if (!iconData) return <div style={{ width: size, height: size }} className={className}></div>;
+            const [tag, attrs, children] = iconData;
+            const safeChildren = Array.isArray(children) ? children : [];
+            return React.createElement(tag, {
+                ...attrs, width: size, height: size, className,
+                dangerouslySetInnerHTML: {
+                    __html: safeChildren.map(child => {
+                        const [cTag, cAttrs] = child;
+                        const attrStr = Object.entries(cAttrs).map(([k, v]) => `${k}="${v}"`).join(' ');
+                        return `<${cTag} ${attrStr}></${cTag}>`;
+                    }).join('')
+                }
+            });
+        };
+
+        // ── 角色資料（比照大富翁4風格設定）──
+        const CHARACTERS = [
+            {
+                id: 'zhiduoxing',
+                name: '知多星',
+                nameEn: 'Zhiduoxing',
+                gender: '男',
+                age: '12 歲',
+                emoji: '🤓',
+                img: 'images/char-zhiduoxing.png',
+                color: 'from-emerald-400 to-teal-500',
+                tagColor: 'bg-emerald-100 text-emerald-700',
+                borderColor: 'border-emerald-400',
+                personality: '安靜沉穩、博學多聞、凡事講求邏輯。雖然年紀小卻有著超齡的知識量，被同學們稱為「行走的百科全書」。偶爾會因為太過認真而顯得有點書呆氣。',
+                likes: ['閱讀百科全書', '下棋', '觀察星空', '收集化石'],
+                dislikes: ['吵鬧的環境', '不合邏輯的事'],
+                skill: {
+                    name: '博學通鑑',
+                    icon: 'book-open',
+                    desc: '答題時有 15% 機率直接揭示正確答案，知識型題目額外加 20% 正確率。',
+                    stats: { knowledge: 95, speed: 60, luck: 45, charm: 55 }
+                },
+                quote: '「知識就是力量，但更重要的是如何運用它。」'
+            },
+            {
+                id: 'xiaomei',
+                name: '小美',
+                nameEn: 'Xiaomei',
+                gender: '女',
+                age: '10 歲',
+                emoji: '⭐',
+                img: 'images/char-xiaomei.png',
+                color: 'from-pink-400 to-rose-500',
+                tagColor: 'bg-pink-100 text-pink-700',
+                borderColor: 'border-pink-400',
+                personality: '活潑開朗、古靈精怪、人見人愛的開心果。有著超強的直覺力，常常在看似不可能的題目中猜對答案，讓對手目瞪口呆。是全校最受歡迎的學生。',
+                likes: ['交朋友', '唱歌跳舞', '吃甜點', '看動漫'],
+                dislikes: ['獨處', '太難的數學題'],
+                skill: {
+                    name: '幸運直覺',
+                    icon: 'sparkles',
+                    desc: '每場比賽有 3 次「直覺猜題」機會，即使不確定答案也有 50% 機率猜中。',
+                    stats: { knowledge: 55, speed: 75, luck: 95, charm: 90 }
+                },
+                quote: '「嘿嘿～我的第六感告訴我，答案是這個！」'
+            },
+            {
+                id: 'laowang',
+                name: '老王教授',
+                nameEn: 'Prof. Wang',
+                gender: '男',
+                age: '68 歲',
+                emoji: '📜',
+                img: 'images/char-laowang.png',
+                color: 'from-amber-400 to-orange-500',
+                tagColor: 'bg-amber-100 text-amber-700',
+                borderColor: 'border-amber-400',
+                personality: '溫文儒雅、學識淵博的退休大學教授。專精歷史與文學，說話時總帶著詩詞典故。雖然年紀大了反應較慢，但答對率極高。最愛的口頭禪是「老夫年輕時啊…」',
+                likes: ['品茶', '書法', '古典音樂', '逛博物館'],
+                dislikes: ['網路用語', '快節奏的事物'],
+                skill: {
+                    name: '以古鑑今',
+                    icon: 'scroll',
+                    desc: '歷史、文學、藝術類題目正確率 +40%。答錯時有 20% 機率獲得第二次作答機會。',
+                    stats: { knowledge: 90, speed: 35, luck: 50, charm: 80 }
+                },
+                quote: '「以史為鏡，可以知興替。這題嘛…讓老夫想想。」'
+            },
+            {
+                id: 'dabao',
+                name: '大寶',
+                nameEn: 'Dabao',
+                gender: '男',
+                age: '5 歲',
+                emoji: '🍭',
+                img: 'images/char-dabao.png',
+                color: 'from-yellow-400 to-amber-500',
+                tagColor: 'bg-yellow-100 text-yellow-700',
+                borderColor: 'border-yellow-400',
+                personality: '天真無邪、憨厚可愛的幼稚園小朋友。看起來什麼都不懂，卻總能以出人意料的方式答對問題。擁有驚人的運氣值，是大家又愛又恨的「天選之人」。',
+                likes: ['吃糖果', '看卡通', '玩泥巴', '跟著媽媽'],
+                dislikes: ['洗澡', '早起上學'],
+                skill: {
+                    name: '天真無敵',
+                    icon: 'baby',
+                    desc: '答錯不扣分（每場限 5 次）。連續答對時觸發「大寶開心」狀態，積分 ×1.5。',
+                    stats: { knowledge: 25, speed: 50, luck: 99, charm: 95 }
+                },
+                quote: '「大寶不知道耶～但是選這個好了！耶～答對了！」'
+            },
+            {
+                id: 'linglong',
+                name: '玲瓏',
+                nameEn: 'Linglong',
+                gender: '女',
+                age: '16 歲',
+                emoji: '💻',
+                img: 'images/char-linglong.png',
+                color: 'from-purple-400 to-indigo-500',
+                tagColor: 'bg-purple-100 text-purple-700',
+                borderColor: 'border-purple-400',
+                personality: '冷靜理性、科技達人型的天才少女。精通程式設計與數理邏輯，凡事用資料分析決策。外表酷酷的，但其實很關心朋友。手機不離身，隨時在查資料。',
+                likes: ['寫程式', '打電動', '拆解機器', '喝黑咖啡'],
+                dislikes: ['沒有 Wi-Fi', '感性的話題'],
+                skill: {
+                    name: '數據分析',
+                    icon: 'cpu',
+                    desc: '科學、數學、科技類題目正確率 +35%。每回合可使用「排除法」移除 1 個錯誤選項。',
+                    stats: { knowledge: 80, speed: 85, luck: 40, charm: 50 }
+                },
+                quote: '「根據我的分析，這個答案的正確機率是 87.3%。」'
+            },
+            {
+                id: 'ashan',
+                name: '阿山',
+                nameEn: 'Ashan',
+                gender: '男',
+                age: '14 歲',
+                emoji: '🏆',
+                img: 'images/char-ashan.png',
+                color: 'from-red-400 to-orange-500',
+                tagColor: 'bg-red-100 text-red-700',
+                borderColor: 'border-red-400',
+                personality: '熱血衝動、永不服輸的運動少年。體育知識無人能敵，但其他科目就慘不忍睹。個性直爽仗義，是朋友們最信賴的夥伴。口頭禪是「男子漢絕不認輸！」',
+                likes: ['籃球', '棒球', '所有運動', '看運動賽事'],
+                dislikes: ['坐著不動', '考試'],
+                skill: {
+                    name: '熱血衝刺',
+                    icon: 'flame',
+                    desc: '搶答速度 +50%。連續答對觸發「熱血模式」，每題額外 +30% 積分，但答錯立即解除。',
+                    stats: { knowledge: 45, speed: 99, luck: 60, charm: 70 }
+                },
+                quote: '「衝啊！誰最快誰就贏！這題我最行！」'
+            },
+        ];
+
+        // ── 導覽列 ──
+        function Navbar() {
+            const [scrolled, setScrolled] = useState(false);
+            const [mobileOpen, setMobileOpen] = useState(false);
+            useEffect(() => {
+                const h = () => setScrolled(window.scrollY > 50);
+                window.addEventListener('scroll', h);
+                return () => window.removeEventListener('scroll', h);
+            }, []);
+            const links = [
+                { href: 'index.html', label: '首頁' },
+                { href: 'gameplay.html', label: '玩法說明' },
+                { href: 'characters.html', label: '角色介紹', active: true },
+                { href: 'download.html', label: '下載遊戲' },
+            ];
+            return (
+                <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-white/90 backdrop-blur-xl shadow-lg shadow-emerald-100/50' : 'bg-transparent'}`}>
+                    <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+                        <a href="index.html" className="flex items-center space-x-2 group">
+                            <span className="text-3xl group-hover:animate-bounce">🧠</span>
+                            <span className={`text-xl font-black tracking-tight transition-colors ${scrolled ? 'text-emerald-600' : 'text-white'}`}>全民猜猜猜</span>
+                        </a>
+                        <div className="hidden md:flex items-center space-x-1">
+                            {links.map(l => (
+                                <a key={l.href} href={l.href}
+                                   className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${l.active ? (scrolled ? 'bg-emerald-100 text-emerald-700' : 'bg-white/20 text-white') : (scrolled ? 'text-gray-600 hover:text-emerald-600 hover:bg-emerald-50' : 'text-white/80 hover:text-white hover:bg-white/10')}`}>
+                                    {l.label}
+                                </a>
+                            ))}
+                            <a href="download.html" className="ml-4 bg-gradient-to-r from-emerald-500 to-blue-500 text-white px-6 py-2.5 rounded-full text-sm font-bold shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-105 transition-all">
+                                立即下載 🎮
+                            </a>
+                        </div>
+                        <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2">
+                            <Icon name={mobileOpen ? 'x' : 'menu'} size={24} className={scrolled ? 'text-gray-700' : 'text-white'} />
+                        </button>
+                    </div>
+                    {mobileOpen && (
+                        <div className="md:hidden bg-white/95 backdrop-blur-xl border-t border-emerald-100 px-6 py-4 space-y-2">
+                            {links.map(l => (
+                                <a key={l.href} href={l.href} onClick={() => setMobileOpen(false)}
+                                   className={`block px-4 py-3 rounded-xl font-bold transition-colors ${l.active ? 'bg-emerald-50 text-emerald-700' : 'text-gray-600 hover:bg-emerald-50 hover:text-emerald-600'}`}>
+                                    {l.label}
+                                </a>
+                            ))}
+                        </div>
+                    )}
+                </nav>
+            );
+        }
+
+        // ── Footer ──
+        function Footer() {
+            return (
+                <footer className="bg-gray-900 text-gray-400 py-16 px-6">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
+                            <div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <span className="text-2xl">🧠</span>
+                                    <span className="text-xl font-black text-white">全民猜猜猜</span>
+                                </div>
+                                <p className="text-sm leading-relaxed">容易上癮 5 分鐘就可以變聰明的全民益智遊戲！</p>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white mb-4">快速連結</h4>
+                                <div className="space-y-2 text-sm">
+                                    <a href="index.html" className="block hover:text-emerald-400 transition-colors">首頁</a>
+                                    <a href="gameplay.html" className="block hover:text-emerald-400 transition-colors">玩法說明</a>
+                                    <a href="characters.html" className="block hover:text-emerald-400 transition-colors">角色介紹</a>
+                                    <a href="download.html" className="block hover:text-emerald-400 transition-colors">下載遊戲</a>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white mb-4">下載連結</h4>
+                                <div className="space-y-2 text-sm">
+                                    <a href="https://itunes.apple.com/us/app/quan-min-cai-cai-cai/id702649687?ls=1&mt=8" className="block hover:text-emerald-400 transition-colors flex items-center gap-2"><Icon name="smartphone" size={14} /> iOS 版</a>
+                                    <a href="https://play.google.com/store/apps/details?id=com.igs.QuizKing" className="block hover:text-emerald-400 transition-colors flex items-center gap-2"><Icon name="smartphone" size={14} /> Android 版</a>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-white mb-4">聯繫我們</h4>
+                                <div className="space-y-2 text-sm">
+                                    <a href="https://www.gt.web" className="flex items-center gap-2 hover:text-emerald-400 transition-colors"><Icon name="globe" size={14} /> gametower 官網</a>
+                                    <a href="#" className="flex items-center gap-2 hover:text-emerald-400 transition-colors"><Icon name="message-circle" size={14} /> Facebook 粉絲團</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="border-t border-gray-800 pt-8 text-center text-sm">
+                            © 2026 全民猜猜猜 by gametower. All rights reserved.
+                        </div>
+                    </div>
+                </footer>
+            );
+        }
+
+        // ── 能力值條 ──
+        function StatBar({ label, value, from, to }) {
+            return (
+                <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-gray-500 w-12 text-right">{label}</span>
+                    <div className="flex-1 bg-gray-200 rounded-full h-3 overflow-hidden">
+                        <div className="skill-bar h-full rounded-full"
+                             style={{ width: `${value}%`, '--bar-from': from, '--bar-to': to }}></div>
+                    </div>
+                    <span className="text-xs font-black text-gray-700 w-8">{value}</span>
+                </div>
+            );
+        }
+
+        // ── 角色詳情彈窗 ──
+        function CharModal({ char, onClose }) {
+            if (!char) return null;
+            return (
+                <div className="fixed inset-0 z-[100] modal-overlay flex items-center justify-center p-4" onClick={onClose}>
+                    <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl"
+                         onClick={e => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className={`bg-gradient-to-br ${char.color} p-8 rounded-t-3xl relative overflow-hidden`}>
+                            <button onClick={onClose} className="absolute top-4 right-4 w-10 h-10 bg-white/20 backdrop-blur rounded-full flex items-center justify-center text-white hover:bg-white/40 transition-colors">
+                                <Icon name="x" size={20} />
+                            </button>
+                            <div className="flex flex-col md:flex-row items-center gap-6">
+                                <div className="w-32 h-32 rounded-3xl overflow-hidden bg-white/20 shadow-xl border-4 border-white/30 flex-shrink-0">
+                                    <img src={char.img} alt={char.name} className="w-full h-full object-cover" />
+                                </div>
+                                <div className="text-center md:text-left">
+                                    <div className="flex items-center gap-2 justify-center md:justify-start mb-1">
+                                        <span className="text-3xl">{char.emoji}</span>
+                                        <h2 className="text-3xl font-black text-white">{char.name}</h2>
+                                    </div>
+                                    <p className="text-white/70 text-sm mb-2">{char.nameEn} · {char.gender} · {char.age}</p>
+                                    <p className="text-white/90 italic text-sm">{char.quote}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-8 space-y-8">
+                            {/* 個性 */}
+                            <div>
+                                <h3 className="text-lg font-black text-gray-900 mb-3 flex items-center gap-2">
+                                    <Icon name="heart" size={18} className="text-pink-500" /> 角色個性
+                                </h3>
+                                <p className="text-gray-600 leading-relaxed">{char.personality}</p>
+                            </div>
+
+                            {/* 喜好 */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 className="text-sm font-bold text-emerald-600 mb-2 flex items-center gap-1">
+                                        <Icon name="thumbs-up" size={14} /> 喜歡
+                                    </h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {char.likes.map(l => (
+                                            <span key={l} className="bg-emerald-50 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full border border-emerald-200">{l}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-bold text-red-500 mb-2 flex items-center gap-1">
+                                        <Icon name="thumbs-down" size={14} /> 不喜歡
+                                    </h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {char.dislikes.map(d => (
+                                            <span key={d} className="bg-red-50 text-red-600 text-xs font-bold px-3 py-1.5 rounded-full border border-red-200">{d}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 專屬技能 */}
+                            <div className={`bg-gradient-to-br ${char.color} rounded-2xl p-6 text-white`}>
+                                <div className="flex items-center gap-3 mb-3">
+                                    <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                                        <Icon name={char.skill.icon} size={24} className="text-white" />
+                                    </div>
+                                    <div>
+                                        <span className="text-xs font-bold text-white/60">專屬技能</span>
+                                        <h4 className="text-xl font-black">{char.skill.name}</h4>
+                                    </div>
+                                </div>
+                                <p className="text-white/90 leading-relaxed">{char.skill.desc}</p>
+                            </div>
+
+                            {/* 能力值 */}
+                            <div>
+                                <h3 className="text-lg font-black text-gray-900 mb-4 flex items-center gap-2">
+                                    <Icon name="bar-chart-3" size={18} className="text-blue-500" /> 能力值
+                                </h3>
+                                <div className="space-y-3">
+                                    <StatBar label="知識" value={char.skill.stats.knowledge} from="#10b981" to="#34d399" />
+                                    <StatBar label="速度" value={char.skill.stats.speed} from="#3b82f6" to="#60a5fa" />
+                                    <StatBar label="運氣" value={char.skill.stats.luck} from="#f59e0b" to="#fbbf24" />
+                                    <StatBar label="魅力" value={char.skill.stats.charm} from="#ec4899" to="#f472b6" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // ── 主應用 ──
+        function App() {
+            const [selectedChar, setSelectedChar] = useState(null);
+
+            return (
+                <div className="min-h-screen">
+                    <Navbar />
+
+                    {/* ═══ HERO ═══ */}
+                    <section className="hero-gradient relative overflow-hidden pt-32 pb-24">
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                            <div className="absolute top-24 left-10 text-6xl opacity-20 float-anim">🤓</div>
+                            <div className="absolute top-20 right-16 text-7xl opacity-15 float-anim-delay">⭐</div>
+                            <div className="absolute bottom-20 left-1/3 text-5xl opacity-20 float-anim">🏆</div>
+                            <div className="absolute bottom-16 right-1/4 text-4xl opacity-15 float-anim-delay">💻</div>
+                        </div>
+                        <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
+                            <span className="text-6xl mb-4 inline-block wiggle">👥</span>
+                            <h1 className="text-4xl md:text-6xl font-black text-white mb-4 tracking-tight drop-shadow-lg">
+                                角色介紹
+                            </h1>
+                            <p className="text-xl text-white/80 max-w-2xl mx-auto leading-relaxed">
+                                六位個性鮮明的角色，各有獨特的專屬技能。<br/>選擇你的代表角色，開始你的益智之旅！
+                            </p>
+                        </div>
+                        <svg className="absolute bottom-0 left-0 w-full" viewBox="0 0 1440 120" preserveAspectRatio="none">
+                            <path fill="#f0fdf4" d="M0,64 C360,120 1080,0 1440,64 L1440,120 L0,120 Z" opacity="0.5"/>
+                            <path fill="#f0fdf4" d="M0,80 C480,30 960,110 1440,60 L1440,120 L0,120 Z"/>
+                        </svg>
+                    </section>
+
+                    {/* ═══ 角色卡片 ═══ */}
+                    <section className="py-24 px-6 bg-gradient-to-b from-emerald-50/50 to-white">
+                        <div className="max-w-7xl mx-auto">
+                            <div className="text-center mb-16">
+                                <span className="inline-block bg-purple-100 text-purple-700 text-sm font-bold px-4 py-1.5 rounded-full mb-4">🎭 選擇你的角色</span>
+                                <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4">
+                                    六大<span className="text-gradient">猜題高手</span>
+                                </h2>
+                                <p className="text-lg text-gray-500">點擊角色卡片查看詳細資訊與專屬技能</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                                {CHARACTERS.map((char, idx) => (
+                                    <div key={char.id}
+                                         onClick={() => setSelectedChar(char)}
+                                         className={`char-card card-hover bg-white rounded-3xl shadow-lg shadow-gray-200/50 overflow-hidden border-2 border-transparent hover:${char.borderColor} group`}
+                                         style={{ animationDelay: `${idx * 0.1}s` }}>
+                                        {/* 角色圖片 */}
+                                        <div className={`bg-gradient-to-br ${char.color} p-6 flex items-center justify-center relative overflow-hidden`}>
+                                            <div className="absolute inset-0 opacity-10">
+                                                <div className="absolute top-3 right-3 text-4xl">{char.emoji}</div>
+                                                <div className="absolute bottom-3 left-3 text-3xl">{char.emoji}</div>
+                                            </div>
+                                            <div className="w-36 h-36 rounded-3xl overflow-hidden bg-white/20 shadow-xl border-4 border-white/30 relative z-10">
+                                                <img src={char.img} alt={char.name} className="char-img w-full h-full object-cover" />
+                                            </div>
+                                        </div>
+
+                                        {/* 角色資訊 */}
+                                        <div className="p-6">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xl">{char.emoji}</span>
+                                                    <h3 className="text-xl font-black text-gray-900">{char.name}</h3>
+                                                </div>
+                                                <span className={`${char.tagColor} text-[10px] font-bold px-2.5 py-1 rounded-full`}>{char.gender} · {char.age}</span>
+                                            </div>
+                                            <p className="text-gray-500 text-sm mb-4 line-clamp-2 leading-relaxed">{char.personality}</p>
+
+                                            {/* 技能預覽 */}
+                                            <div className="bg-gray-50 rounded-xl p-3 flex items-center gap-3">
+                                                <div className={`w-10 h-10 bg-gradient-to-br ${char.color} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                                                    <Icon name={char.skill.icon} size={18} className="text-white" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-xs text-gray-400">專屬技能</div>
+                                                    <div className="text-sm font-bold text-gray-800 truncate">{char.skill.name}</div>
+                                                </div>
+                                                <Icon name="chevron-right" size={16} className="text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* ═══ 角色對照表 ═══ */}
+                    <section className="py-24 px-6 bg-white">
+                        <div className="max-w-5xl mx-auto">
+                            <div className="text-center mb-12">
+                                <span className="inline-block bg-blue-100 text-blue-700 text-sm font-bold px-4 py-1.5 rounded-full mb-4">📊 能力值比較</span>
+                                <h2 className="text-3xl md:text-4xl font-black text-gray-900">角色能力值總覽</h2>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead>
+                                        <tr className="border-b-2 border-gray-200">
+                                            <th className="text-left p-4 text-sm font-bold text-gray-500">角色</th>
+                                            <th className="text-center p-4 text-sm font-bold text-emerald-600">🧠 知識</th>
+                                            <th className="text-center p-4 text-sm font-bold text-blue-600">⚡ 速度</th>
+                                            <th className="text-center p-4 text-sm font-bold text-amber-600">🍀 運氣</th>
+                                            <th className="text-center p-4 text-sm font-bold text-pink-600">💖 魅力</th>
+                                            <th className="text-center p-4 text-sm font-bold text-gray-500">總和</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {CHARACTERS.map(c => {
+                                            const total = c.skill.stats.knowledge + c.skill.stats.speed + c.skill.stats.luck + c.skill.stats.charm;
+                                            return (
+                                                <tr key={c.id} className="border-b border-gray-100 hover:bg-emerald-50/50 transition-colors cursor-pointer" onClick={() => setSelectedChar(c)}>
+                                                    <td className="p-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-xl">{c.emoji}</span>
+                                                            <span className="font-bold text-gray-900">{c.name}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="text-center p-4 font-black text-emerald-600">{c.skill.stats.knowledge}</td>
+                                                    <td className="text-center p-4 font-black text-blue-600">{c.skill.stats.speed}</td>
+                                                    <td className="text-center p-4 font-black text-amber-600">{c.skill.stats.luck}</td>
+                                                    <td className="text-center p-4 font-black text-pink-600">{c.skill.stats.charm}</td>
+                                                    <td className="text-center p-4 font-black text-gray-900">{total}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* ═══ CTA ═══ */}
+                    <section className="hero-gradient py-20 px-6 text-center relative overflow-hidden">
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                            <div className="absolute top-10 left-20 text-5xl opacity-20 float-anim">🎮</div>
+                            <div className="absolute bottom-10 right-20 text-6xl opacity-15 float-anim-delay">🧠</div>
+                        </div>
+                        <div className="max-w-3xl mx-auto relative z-10">
+                            <span className="text-6xl mb-6 inline-block wiggle">🚀</span>
+                            <h2 className="text-4xl md:text-5xl font-black text-white mb-4">選好你的角色了嗎？</h2>
+                            <p className="text-xl text-white/80 mb-10">立即下載，帶領你的角色征服全部題目！</p>
+                            <a href="download.html" className="inline-flex items-center gap-2 bg-white text-emerald-600 px-10 py-4 rounded-2xl font-black text-lg shadow-2xl hover:scale-105 transition-all">
+                                <Icon name="download" size={24} /> 免費下載
+                            </a>
+                        </div>
+                    </section>
+
+                    <Footer />
+
+                    {/* 彈窗 */}
+                    <CharModal char={selectedChar} onClose={() => setSelectedChar(null)} />
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
